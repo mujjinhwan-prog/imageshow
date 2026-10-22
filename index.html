@@ -133,6 +133,8 @@ body.editing::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-ar
 .prow .tools{display:flex;gap:6px;flex-wrap:wrap}
 .tool{border:1px solid var(--line);background:transparent;border-radius:8px;padding:6px 10px;font-size:.82rem;min-height:36px}
 .tool:hover{border-color:var(--accent)}
+.prow.busy{opacity:.55;pointer-events:none}
+.prow .pimg img{transition:transform .35s ease}
 .tool.del{color:var(--danger)}
 .tool.confirm{background:var(--danger);color:#fff;border-color:var(--danger)}
 @media (max-width:520px){
@@ -405,8 +407,8 @@ body.editing::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-ar
    (Supabase 대시보드 → Project Settings → API)
    비워 두면 이 브라우저에만 저장되는 테스트 모드로 동작해요.
    ========================================================= */
-const SUPABASE_URL      = 'https://iloybfyzbjslcvtpvctv.supabase.co';   // 예: 'https://abcd1234.supabase.co'
-const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imlsb3liZnl6YmpzbGN2dHB2Y3R2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTE2OTIwNDcsImV4cCI6MjEwNzI2ODA0N30.OLr-QQVYqaT844HG6Z4RjNfKOSrnjTx8ZqPa6GIJp6M';   // 예: 'eyJhbGciOi...'
+const SUPABASE_URL      = '';   // 예: 'https://abcd1234.supabase.co'
+const SUPABASE_ANON_KEY = '';   // 예: 'eyJhbGciOi...'
 const ALBUM_ID = 'sketch';      // 앨범을 여러 개 만들 때 이름만 바꾸면 돼요
 const TABLE    = 'albums';
 const BUCKET   = 'album-photos';
@@ -647,6 +649,8 @@ function renderEditor(){
         <div class="field"><label for="w-${p.id}">언제 · 어디서</label><input id="w-${p.id}" maxlength="40" placeholder="예: 1994년 여름, 경포대"></div>
         <div class="field"><label for="c-${p.id}">사진 이야기</label><textarea id="c-${p.id}" maxlength="300" placeholder="이 사진에 담긴 이야기를 적어 주세요"></textarea></div>
         <div class="tools">
+          <button class="tool" type="button" data-a="rl" aria-label="왼쪽으로 90도 돌리기">⟲ 왼쪽</button>
+          <button class="tool" type="button" data-a="rr" aria-label="오른쪽으로 90도 돌리기">⟳ 오른쪽</button>
           <button class="tool" type="button" data-a="up" ${i===0?'disabled':''}>↑ 앞으로</button>
           <button class="tool" type="button" data-a="down" ${i===album.photos.length-1?'disabled':''}>↓ 뒤로</button>
           <button class="tool del" type="button" data-a="del">삭제</button>
@@ -661,6 +665,7 @@ function renderEditor(){
     li.querySelector('.tools').onclick=e=>{
       const b=e.target.closest('button'); if(!b) return;
       const a=b.dataset.a, idx=album.photos.indexOf(p);
+      if (a==='rl'||a==='rr'){ rotatePhoto(p.id, a==='rl'?-90:90, li); return; }
       if (a==='up'&&idx>0){ [album.photos[idx-1],album.photos[idx]]=[album.photos[idx],album.photos[idx-1]]; Store.schedule(); renderEditor(); focusRow(p.id,'up'); }
       if (a==='down'&&idx<album.photos.length-1){ [album.photos[idx+1],album.photos[idx]]=[album.photos[idx],album.photos[idx+1]]; Store.schedule(); renderEditor(); focusRow(p.id,'down'); }
       if (a==='del'){
@@ -671,6 +676,28 @@ function renderEditor(){
     };
     list.appendChild(li);
   });
+}
+const rotating=new Set();
+async function rotatePhoto(id,deg,row){
+  if (rotating.has(id)) return;
+  const p0=album.photos.find(x=>x.id===id); if(!p0) return;
+  rotating.add(id); row.classList.add('busy');
+  const thumb=row.querySelector('.pimg img'); if(thumb) thumb.style.transform=`rotate(${deg}deg)`;
+  try{
+    const res=await fetch(Store.url(p0.ref)); if(!res.ok) throw new Error('fetch '+res.status);
+    const blob=await res.blob();
+    let src; try{ src=await createImageBitmap(blob); }
+    catch(e){ src=await new Promise((ok,no)=>{ const im=new Image(); im.onload=()=>ok(im); im.onerror=no; im.src=URL.createObjectURL(blob); }); }
+    const c=document.createElement('canvas'); c.width=src.height; c.height=src.width;
+    const g=c.getContext('2d'); g.translate(c.width/2,c.height/2); g.rotate(deg*Math.PI/180); g.drawImage(src,-src.width/2,-src.height/2);
+    const out=await new Promise(r=>c.toBlob(r,'image/jpeg',.9));
+    const newRef=await Store.putImage(out);
+    const p=album.photos.find(x=>x.id===id);
+    if (!p){ Store.removeImage(newRef); return; }
+    const old=p.ref; p.ref=newRef;
+    Store.schedule(); await Store.flush(); Store.removeImage(old);
+  }catch(e){ toast('사진을 돌리지 못했어요. 다시 시도해 주세요.'+(e&&e.code?' ('+e.code+')':'')); }
+  finally{ rotating.delete(id); if(!$('#editor').hidden) renderEditor(); }
 }
 function focusRow(id,a){ const b=document.querySelector(`.prow[data-id="${id}"] [data-a="${a}"]`); if(b&&!b.disabled) b.focus(); }
 
