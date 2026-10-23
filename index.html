@@ -250,7 +250,7 @@ body.editing::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-ar
   pointer-events:none;opacity:0;transition:opacity .45s}
 #viewer.hide-ui .brand{opacity:1}
 #viewer.intro-on .brand{opacity:0}
-.brand-name{font-family:"Great Vibes","Gowun Batang",cursive,serif;font-size:1.55rem;line-height:1.2;color:#ead9a4;opacity:.92;
+.brand-name{font-family:"Great Vibes","Gowun Batang",cursive,serif;font-size:.78rem;line-height:1.2;color:#ead9a4;opacity:.92;
   text-shadow:0 1px 5px rgba(0,0,0,.75);min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding-right:.2em}
 .brand-logo{height:68px;width:auto;max-width:168px;object-fit:contain;margin-left:auto;opacity:.92;filter:drop-shadow(0 1px 4px rgba(0,0,0,.6))}
 #viewer.fill .sl,#viewer.fill .layer:not(.m-polaroid){padding:0}
@@ -870,6 +870,7 @@ function go(step,auto){
   const n=album.photos.length; let j=V.i+step;
   if (j<0||j>=n){ if(!auto){ if(V.mode==='slide') placeTrack(true); return; } j=(j+n)%n; }
   V.i=j;
+  SFX.nav(V.mode,step);
   if (V.mode==='slide') placeTrack(true); else showLayer(step);
   caption(false);
   if (V.playing) startTimer();
@@ -884,49 +885,73 @@ function syncPlay(){ const b=$('#vPlay'); b.textContent=V.playing?'❚❚':'▶'
 function pokeUI(){ viewer.classList.remove('hide-ui'); clearTimeout(V.uiT); V.uiT=setTimeout(()=>{ viewer.classList.add('hide-ui'); },3000); }
 
 /* ---------------- sound effects (synthesized, no files) ---------------- */
-const SFX={ ctx:null, bus:null, nb:null, on:true,
+const SFX={ ctx:null, main:null, bus:null, nb:null, on:true,
   init(){
     try{
       if(!this.ctx){ const AC=window.AudioContext||window.webkitAudioContext; if(!AC) return; this.ctx=new AC(); }
+      if(!this.main){ this.main=this.ctx.createGain(); this.main.gain.value=this.on?1:0; this.main.connect(this.ctx.destination); }
       if(this.ctx.state==='suspended') this.ctx.resume();
       /* iOS: play a silent tick inside the tap so later sounds are allowed */
       const b=this.ctx.createBuffer(1,1,this.ctx.sampleRate), s=this.ctx.createBufferSource(); s.buffer=b; s.connect(this.ctx.destination); s.start(0);
     }catch(e){}
   },
-  begin(){ if(!this.ctx) return; this.bus=this.ctx.createGain(); this.bus.gain.value=this.on?1:0; this.bus.connect(this.ctx.destination); },
+  out(){ return this.bus||this.main; },
+  begin(){ if(!this.ctx||!this.main) return; this.bus=this.ctx.createGain(); this.bus.gain.value=1; this.bus.connect(this.main); },
   stop(){ try{ if(this.bus){ this.bus.gain.setTargetAtTime(0,this.ctx.currentTime,0.02); const b=this.bus; setTimeout(()=>{ try{b.disconnect();}catch(e){} },400); this.bus=null; } }catch(e){} },
-  mute(m){ this.on=!m; try{ if(this.bus) this.bus.gain.setTargetAtTime(this.on?1:0,this.ctx.currentTime,0.02); }catch(e){} },
+  mute(m){ this.on=!m; try{ if(this.main) this.main.gain.setTargetAtTime(this.on?1:0,this.ctx.currentTime,0.02); }catch(e){} },
   noise(){ if(this.nb) return this.nb; const c=this.ctx,n=Math.floor(c.sampleRate*0.4),b=c.createBuffer(1,n,c.sampleRate),d=b.getChannelData(0); for(let i=0;i<n;i++) d[i]=Math.random()*2-1; return this.nb=b; },
+  env(g,at,peak,att,dur){ g.gain.setValueAtTime(0.0001,at); g.gain.exponentialRampToValueAtTime(peak,at+att); g.gain.exponentialRampToValueAtTime(0.0001,at+dur); },
   flick(t,vol,freq,dur){
-    if(!this.ctx||!this.bus) return;
+    const o=this.out(); if(!this.ctx||!o||!this.on) return;
     try{
       const c=this.ctx, at=c.currentTime+Math.max(0,t);
       const s=c.createBufferSource(); s.buffer=this.noise();
       const f=c.createBiquadFilter(); f.type='bandpass'; f.frequency.value=freq*(0.8+Math.random()*0.4); f.Q.value=0.9;
       const h=c.createBiquadFilter(); h.type='highpass'; h.frequency.value=900;
-      const g=c.createGain(); g.gain.setValueAtTime(0.0001,at); g.gain.exponentialRampToValueAtTime(vol,at+0.003); g.gain.exponentialRampToValueAtTime(0.0001,at+dur);
-      s.connect(f); f.connect(h); h.connect(g); g.connect(this.bus); s.start(at,Math.random()*0.3); s.stop(at+dur+0.03);
+      const g=c.createGain(); this.env(g,at,vol,0.003,dur);
+      s.connect(f); f.connect(h); h.connect(g); g.connect(o); s.start(at,Math.random()*0.3); s.stop(at+dur+0.03);
     }catch(e){}
   },
-  thump(t){
-    if(!this.ctx||!this.bus) return;
+  tone(t,type,f0,f1,vol,att,dur){
+    const o=this.out(); if(!this.ctx||!o||!this.on) return;
     try{
       const c=this.ctx, at=c.currentTime+Math.max(0,t);
-      const o=c.createOscillator(); o.type='sine'; o.frequency.setValueAtTime(150,at); o.frequency.exponentialRampToValueAtTime(55,at+0.14);
-      const g=c.createGain(); g.gain.setValueAtTime(0.0001,at); g.gain.exponentialRampToValueAtTime(0.5,at+0.006); g.gain.exponentialRampToValueAtTime(0.0001,at+0.18);
-      o.connect(g); g.connect(this.bus); o.start(at); o.stop(at+0.2);
-      this.flick(t,0.35,1400,0.07);
+      const osc=c.createOscillator(); osc.type=type; osc.frequency.setValueAtTime(f0,at); osc.frequency.exponentialRampToValueAtTime(f1,at+dur);
+      const g=c.createGain(); this.env(g,at,vol,att,dur);
+      osc.connect(g); g.connect(o); osc.start(at); osc.stop(at+dur+0.05);
     }catch(e){}
   },
-  whoosh(t,dur){
-    if(!this.ctx||!this.bus) return;
+  sweep(t,f0,f1,vol,dur,q){
+    const o=this.out(); if(!this.ctx||!o||!this.on) return;
     try{
       const c=this.ctx, at=c.currentTime+Math.max(0,t);
       const s=c.createBufferSource(); s.buffer=this.noise(); s.loop=true;
-      const f=c.createBiquadFilter(); f.type='bandpass'; f.Q.value=1.4; f.frequency.setValueAtTime(500,at); f.frequency.exponentialRampToValueAtTime(3200,at+dur);
-      const g=c.createGain(); g.gain.setValueAtTime(0.0001,at); g.gain.exponentialRampToValueAtTime(0.16,at+dur*0.45); g.gain.exponentialRampToValueAtTime(0.0001,at+dur);
-      s.connect(f); f.connect(g); g.connect(this.bus); s.start(at); s.stop(at+dur+0.05);
+      const f=c.createBiquadFilter(); f.type='bandpass'; f.Q.value=q||1.4; f.frequency.setValueAtTime(f0,at); f.frequency.exponentialRampToValueAtTime(f1,at+dur);
+      const g=c.createGain(); g.gain.setValueAtTime(0.0001,at); g.gain.exponentialRampToValueAtTime(vol,at+dur*0.45); g.gain.exponentialRampToValueAtTime(0.0001,at+dur);
+      s.connect(f); f.connect(g); g.connect(o); s.start(at); s.stop(at+dur+0.05);
     }catch(e){}
+  },
+  thump(t){ this.tone(t,'sine',150,55,0.5,0.006,0.18); this.flick(t,0.35,1400,0.07); },
+  whoosh(t,dur){ this.sweep(t,500,3200,0.16,dur,1.4); },
+  /* one sound per viewing style, played when the photo changes */
+  nav(mode,dir){
+    if(!this.ctx||!this.on) return;
+    if(this.ctx.state==='suspended') try{ this.ctx.resume(); }catch(e){}
+    const back=dir<0;
+    switch(mode){
+      case 'slide':    /* quick swipe */
+        this.sweep(0, back?2600:900, back?900:2600, 0.12, 0.22, 1.2); this.flick(0.16,0.12,2200,0.04); break;
+      case 'fade':     /* soft glass chime */
+        this.tone(0,'sine',back?784:1047,back?784:1047,0.07,0.02,1.4); this.tone(0.06,'sine',back?1175:1568,back?1175:1568,0.035,0.02,1.1); break;
+      case 'kenburns': /* slow cinematic swell */
+        this.sweep(0,300,900,0.1,1.1,0.8); this.tone(0,'sine',110,98,0.08,0.4,1.3); break;
+      case 'polaroid': /* camera shutter, then the print lands */
+        this.flick(0,0.4,4200,0.03); this.flick(0.07,0.32,2600,0.04); this.tone(0.02,'square',1900,1500,0.03,0.002,0.05); this.thump(0.45); break;
+      case 'flip':     /* paper page turn */
+        this.sweep(0, back?2400:700, back?700:2400, 0.13, 0.42, 0.9); for(let k=0;k<5;k++) this.flick(0.05+k*0.05,0.08,3200,0.03); this.flick(0.42,0.18,1600,0.05); break;
+      case 'zoom':     /* rising zoom-through */
+        this.sweep(0, back?3000:400, back?400:3000, 0.15, 0.55, 1.6); this.tone(0,'sine',back?520:220,back?220:520,0.05,0.1,0.5); break;
+    }
   }
 };
 try{ if(localStorage.getItem('album.sound')==='0') SFX.on=false; }catch(e){}
