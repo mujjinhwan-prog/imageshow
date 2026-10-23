@@ -258,7 +258,7 @@ body.editing::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-ar
 .toast{position:fixed;left:50%;bottom:calc(env(safe-area-inset-bottom,0px) + 20px);transform:translateX(-50%);z-index:80;background:var(--ink);color:var(--bg);
   padding:10px 16px;border-radius:999px;font-size:.88rem;max-width:calc(100% - 32px);box-shadow:0 8px 24px rgba(0,0,0,.25)}
 </style>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.3/dist/umd/supabase.js"></script>
 </head>
 <body>
 
@@ -407,8 +407,8 @@ body.editing::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-ar
    (Supabase 대시보드 → Project Settings → API)
    비워 두면 이 브라우저에만 저장되는 테스트 모드로 동작해요.
    ========================================================= */
-const SUPABASE_URL      = '';   // 예: 'https://abcd1234.supabase.co'
-const SUPABASE_ANON_KEY = '';   // 예: 'eyJhbGciOi...'
+const SUPABASE_URL      = 'https://iloybfyzbjslcvtpvctv.supabase.co';   // 예: 'https://abcd1234.supabase.co'
+const SUPABASE_ANON_KEY = 'sb_publishable_UWOW8stjS7zwEzrNMdIphA_G1fuZssA';   // 예: 'eyJhbGciOi...'
 const ALBUM_ID = 'sketch';      // 앨범을 여러 개 만들 때 이름만 바꾸면 돼요
 const TABLE    = 'albums';
 const BUCKET   = 'album-photos';
