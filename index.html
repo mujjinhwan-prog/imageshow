@@ -389,7 +389,7 @@ body.editing::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-ar
 <div id="viewer" hidden>
   <div class="pbar" id="pbar"></div>
   <div id="stage"></div>
-  <div class="brand" aria-hidden="true"><span class="brand-name" id="bName"></span><img class="brand-logo" id="bLogo" alt="" hidden></div>
+  <div class="brand" aria-hidden="true"><span class="brand-name" id="bName"></span></div>
   <div class="chrome top">
     <button class="vbtn" id="vClose" type="button" aria-label="닫기">✕</button>
     <span class="ttl" id="vTitle"></span>
@@ -780,7 +780,6 @@ function openViewer(i,withIntro){
   viewer.hidden=false; document.body.classList.add('viewing');
   $('#vTitle').textContent=album.title; $('#vMode').value=V.mode;
   $('#bName').textContent=album.title||'';
-  { const bl=$('#bLogo'); if(album.logo){ bl.src=Store.url(album.logo); bl.hidden=false; } else { bl.removeAttribute('src'); bl.hidden=true; } }
   applyFit();
   try{ navigator.wakeLock&&navigator.wakeLock.request('screen').then(l=>V.lock=l).catch(()=>{}); }catch(e){}
   tryLock(); applyOrient();
