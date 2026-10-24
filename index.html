@@ -320,6 +320,15 @@ body.editing::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-ar
 
   <p class="note" id="localNote" hidden>Supabase 연결 정보가 아직 없어서 이 브라우저에만 저장돼요. 파일 맨 아래 설정값을 채워 주세요.</p>
 
+
+  <section class="section" aria-labelledby="thumbHead">
+    <div class="section-head">
+      <h2 id="thumbHead">사진 목록</h2>
+      <span class="eyebrow" id="thumbCount"></span>
+    </div>
+    <div id="thumbs"></div>
+  </section>
+
   <section class="section" aria-labelledby="modeHead">
     <div class="section-head">
       <h2 id="modeHead">보여주는 방식</h2>
@@ -331,14 +340,6 @@ body.editing::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-ar
       <div class="seg" id="orientSeg" role="group" aria-labelledby="orientLbl"></div>
       <span class="hint">휴대폰을 돌리지 않아도 가로·세로로 맞춰 보여줘요</span>
     </div>
-  </section>
-
-  <section class="section" aria-labelledby="thumbHead">
-    <div class="section-head">
-      <h2 id="thumbHead">사진 목록</h2>
-      <span class="eyebrow" id="thumbCount"></span>
-    </div>
-    <div id="thumbs"></div>
   </section>
 
   <form id="adminForm" class="card" hidden novalidate>
